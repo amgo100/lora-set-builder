@@ -131,7 +131,9 @@ character consistent.
 25 % full body), eight camera angles, six expressions, sixteen outfits, twelve settings and six
 lighting setups, without repeating combinations. Outfits are spelled out in detail (garments,
 colours, materials, footwear) and the prompt tells the model not to use the clothes from the
-reference images; with a vague outfit such as “a hoodie” the model tends to copy them. Tick
+reference images; with a vague outfit such as “a hoodie” the model tends to copy them. Write
+the top first: captions for close-ups and medium shots keep only the part of the outfit before
+the first comma, so they do not mention trousers and shoes that are out of frame. Tick
 *keep the same outfit* for a character whose costume is part of its identity. Every field is editable. Expand a row (▸) to see the exact
 prompt, add extra instructions, write a prompt by hand, or override the caption.
 
