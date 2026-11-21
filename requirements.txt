@@ -1,0 +1,9 @@
+fastapi>=0.110
+uvicorn>=0.27
+httpx>=0.27
+pillow>=10
+pyyaml>=6
+python-multipart>=0.0.9
+# optional: face-similarity scores on variants
+# insightface>=0.7
+# onnxruntime>=1.17

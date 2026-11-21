@@ -1,0 +1,7 @@
+__pycache__/
+*.pyc
+.venv/
+# project folders hold photos, generated images and secrets
+projects/
+.secrets.yaml
+.thumbs/
