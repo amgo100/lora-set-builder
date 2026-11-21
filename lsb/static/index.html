@@ -102,6 +102,9 @@ button.b.small { padding: 3px 8px; font-size: 12px; }
 #lightbox .lb-main img { width: 100%; height: calc(100vh - 40px); object-fit: contain; }
 #lightbox .lb-side { width: 300px; background: #1f1f1d; padding: 16px; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; }
 #lightbox .lb-side img { width: 100%; border-radius: 6px; }
+/* the panel scrolls as a whole; without this the prompt box (itself
+   scrollable) is the item that shrinks, down to zero height */
+#lightbox .lb-side > * { flex-shrink: 0; }
 #lightbox .lb-side .b { background: #2c2c2a; color: #eee; border-color: #444; }
 #lightbox .lb-side .b.primary { background: var(--pick); border-color: var(--pick); }
 #lightbox .keys { font-size: 12px; color: #aaa; }
@@ -257,10 +260,10 @@ button.b.small { padding: 3px 8px; font-size: 12px; }
     </div>
     <div id="lb-score"></div>
     <div class="lb-small" id="lb-seed"></div>
+    <div class="lb-small">Prompt</div>
+    <div class="lb-prompt" id="lb-prompt"></div>
     <div class="lb-small" id="lb-refs-label">References used</div>
     <div id="lb-refs"></div>
-    <div style="font-size:12px;color:#aaa">Prompt</div>
-    <div class="lb-prompt" id="lb-prompt"></div>
   </div>
 </div>
 <div class="toast" id="toast"></div>
