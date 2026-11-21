@@ -240,6 +240,21 @@ def compose_prompt(take: dict[str, Any], settings: dict[str, Any], n_refs: int) 
     return f"A new photograph of {subject_ref}. {scene} {lock}"
 
 
+def compose_refine_prompt(correction: str, settings: dict[str, Any]) -> str:
+    """Prompt for refining one generated variant: <image1> is that variant.
+
+    No identity lock and no other references on purpose: the correction may
+    change exactly what the lock would hold fixed (hair, glasses, face shape).
+    """
+    who = "person" if settings.get("subject_kind", "person") == "person" else "character"
+    fix = correction.strip().rstrip(".")
+    return (
+        f"Edit <image1>: {fix}. Change only that and keep everything else in <image1> "
+        f"exactly as it is: the same {who}, pose, framing, background, lighting and "
+        f"image style."
+    )
+
+
 def compose_caption(take: dict[str, Any], settings: dict[str, Any]) -> str:
     """Training caption: trigger + class, then only what varies between images.
 
@@ -286,6 +301,7 @@ __all__ = [
     "anchor_take",
     "turnaround_take",
     "compose_prompt",
+    "compose_refine_prompt",
     "compose_caption",
     "source_caption",
     "output_size",

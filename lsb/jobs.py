@@ -16,7 +16,7 @@ from . import identity
 from .comfy import ComfyError, make_client
 from .graph import build_graph
 from .project import Project, new_id
-from .shots import compose_prompt, output_size
+from .shots import compose_prompt, compose_refine_prompt, output_size
 
 
 class Generator:
@@ -51,17 +51,32 @@ class Generator:
         return self._client
 
     # --------------------------------------------------------------- api
-    def request(self, take_id: str, count: int) -> list[str]:
-        """Add `count` new variants to a take and mark them queued."""
+    def request(
+        self,
+        take_id: str,
+        count: int,
+        *,
+        parent: str = "",
+        correction: str = "",
+    ) -> list[str]:
+        """Add `count` new variants to a take and mark them queued.
+
+        With `parent` (a variant id of the same take) the new variants are
+        refinements: edits of that variant's image with `correction` applied.
+        The first one reuses the parent's seed, so its composition stays as
+        close to the original as the model allows; the rest get new seeds.
+        """
         p = self.project
         with p.lock:
             take = p.take(take_id)
+            parent_seed = p.variant(take_id, parent)["seed"] if parent else None
             ids = []
-            for _ in range(count):
+            for i in range(count):
+                seed = parent_seed if parent and i == 0 else random.randint(1, 2**48)
                 v = {
                     "id": new_id("v"),
                     "file": "",
-                    "seed": random.randint(1, 2**48),
+                    "seed": seed,
                     "prompt": "",
                     "refs": [],
                     "status": "queued",
@@ -71,6 +86,9 @@ class Generator:
                     "error": "",
                     "created": time.time(),
                 }
+                if parent:
+                    v["parent"] = parent
+                    v["correction"] = correction
                 take["variants"].append(v)
                 ids.append(v["id"])
             p.save()
@@ -134,6 +152,15 @@ class Generator:
             raise ComfyError("no reference images: mark at least one source as a reference")
         return refs[:max_refs]
 
+    def _parent_image(self, take: dict[str, Any], parent_id: str):
+        """Local path of the variant a refinement edits."""
+        p = self.project
+        parent = next((x for x in take["variants"] if x["id"] == parent_id), None)
+        path = p.path_of_variant(take["id"], parent) if parent and parent.get("file") else None
+        if path is None or not path.exists():
+            raise ComfyError("the image being refined was deleted")
+        return path
+
     def _submit_queued(self) -> bool:
         p = self.project
         with p.lock:
@@ -156,9 +183,13 @@ class Generator:
         settings = p.settings
         for take, v in pending:
             try:
-                ref_paths = self._refs_for(take)
+                if v.get("parent"):
+                    ref_paths = [self._parent_image(take, v["parent"])]
+                    prompt = compose_refine_prompt(v.get("correction", ""), settings)
+                else:
+                    ref_paths = self._refs_for(take)
+                    prompt = compose_prompt(take, settings, len(ref_paths))
                 names = [client.upload(path) for path in ref_paths]
-                prompt = compose_prompt(take, settings, len(names))
                 w, h = output_size(take.get("aspect", "portrait"), settings["comfy"]["long_side"])
                 graph = build_graph(
                     comfy=settings["comfy"],
@@ -167,7 +198,7 @@ class Generator:
                     width=w,
                     height=h,
                     images=names,
-                    use_image_latent=take["mode"] == "edit",
+                    use_image_latent=take["mode"] == "edit" or bool(v.get("parent")),
                     filename_prefix=f"lsb/{settings['name']}/{take['id']}",
                 )
                 prompt_id = client.queue(graph)
@@ -176,7 +207,7 @@ class Generator:
                         status="running",
                         prompt_id=prompt_id,
                         prompt=prompt,
-                        refs=[str(r.name) for r in ref_paths],
+                        refs=[] if v.get("parent") else [str(r.name) for r in ref_paths],
                         error="",
                     )
             except Exception as e:

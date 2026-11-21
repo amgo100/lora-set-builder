@@ -147,8 +147,17 @@ through its queue and results appear as they finish. For each take:
 
 - click an image to see it large next to the references it was made from; **←/→** moves between
   variants, **P** picks;
-- none right? Type a correction in the box under the take (“hair shorter, no glasses, rounder
-  face”) and **Apply and generate** — the correction is added to the prompt for the new variants;
+- one is close? Open it, type what to change (“hair shorter, no glasses”) in **Refine** and
+  press Enter. This queues *N* edits of that exact image: it is sent as `<image1>` with
+  “change only this, keep everything else”, and the canvas follows it. The first refinement reuses
+  the original's seed, so it stays closest to it; the others get new seeds. Refinements carry a
+  *refined* badge and can be refined again. They send only that image, without the references or
+  the identity lock, so a correction to the face or hair is not overruled. The caption still comes
+  from the take, so if a refinement changes something the caption mentions (outfit, setting),
+  edit the take to match;
+- none close? Type in the box under the take and **Apply and generate**. That text is added to
+  the take's prompt and the new variants start from scratch with new seeds. It replaces what was
+  in the box before, so repeat earlier corrections you want to keep;
 - **Clear unpicked** deletes the rejects;
 - **Generate more for takes with no pick** tops up every take that still has no pick.
 
@@ -206,8 +215,8 @@ and train the final LoRA.
 
 ## What was tested
 
-The full flow (sources, default shot list, all three take modes, picking, promoting anchors to
-references, export) was run against `tools/mock_comfy.py`, which checks graph wiring but does not
+The full flow (sources, default shot list, all three take modes, picking, refining, promoting
+anchors to references, export) was run against `tools/mock_comfy.py`, which checks graph wiring but does not
 run the model. Not yet run against a real ComfyUI:
 
 - the graph in `lsb/graph.py` follows the official template
