@@ -92,6 +92,10 @@ table.takes tr.expanded td { background: #fafaf8; }
 #lightbox .lb-side .b { background: #2c2c2a; color: #eee; border-color: #444; }
 #lightbox .lb-side .b.primary { background: var(--pick); border-color: var(--pick); }
 #lightbox .keys { font-size: 12px; color: #aaa; }
+#lightbox .lb-refine { display: flex; flex-direction: column; gap: 6px; padding: 10px 0; border-top: 1px solid #333; border-bottom: 1px solid #333; }
+#lightbox .lb-refine input { background: #2c2c2a; color: #eee; border-color: #444; }
+#lightbox .lb-small { font-size: 12px; color: #aaa; }
+.var .refined { position: absolute; left: 6px; top: 6px; background: rgba(47,93,138,.88); color: #fff; font-size: 11px; padding: 1px 6px; border-radius: 4px; }
 #lightbox .lb-prompt { font-size: 11px; color: #bbb; white-space: pre-wrap; max-height: 160px; overflow: auto; }
 .report-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
 .report-grid .panel { margin: 0; }
@@ -201,7 +205,7 @@ table.takes tr.expanded td { background: #fafaf8; }
 <!-- ============================================================ REVIEW -->
 <section id="review">
   <h2>Generate &amp; pick</h2>
-  <p class="help">Generate variants for each take, then pick the one that looks most like the subject. If none match, write a correction in the box and generate again. Click an image to compare it with the references; keys: ← → move, <b>P</b> pick, <b>Esc</b> close.</p>
+  <p class="help">Generate variants for each take, then pick the one that looks most like the subject. If one is close, open it and <b>Refine</b> it: describe what to change and it is edited from that image. If none is close, add to the prompt in the box under the take and generate again. Click an image to compare it with the references; keys: ← → move, <b>P</b> pick, <b>Esc</b> close.</p>
   <div class="toolbar">
     <button class="b primary" id="gen-missing">Generate all takes not yet tried</button>
     <button class="b" id="gen-unpicked">Generate more for takes with no pick</button>
@@ -237,8 +241,14 @@ table.takes tr.expanded td { background: #fafaf8; }
       <button class="b" id="lb-promote" style="display:none">Use as reference</button>
       <button class="b" id="lb-close">Close</button></div>
     <div class="keys">← → previous / next variant</div>
+    <div class="lb-refine">
+      <label class="lb-small" for="lb-fix">Refine this image: describe what to change. The rest of the image is kept; the first new variant reuses this one's seed.</label>
+      <input type="text" id="lb-fix" placeholder="e.g. hair shorter, no glasses">
+      <div class="row"><button class="b" id="lb-refine">Refine (Enter)</button></div>
+    </div>
     <div id="lb-score"></div>
-    <div style="font-size:12px;color:#aaa">References used</div>
+    <div class="lb-small" id="lb-seed"></div>
+    <div class="lb-small" id="lb-refs-label">References used</div>
     <div id="lb-refs"></div>
     <div style="font-size:12px;color:#aaa">Prompt</div>
     <div class="lb-prompt" id="lb-prompt"></div>
@@ -423,6 +433,7 @@ function variantHTML(t, v) {
   if (v.status === 'done') {
     return `<div class="var ${v.picked ? 'picked' : ''}" data-t="${t.id}" data-v="${v.id}">
       <img src="/files/takes/${t.id}/${v.file}?w=420" loading="lazy" alt="">
+      ${v.parent ? `<span class="refined" title="Refined: ${esc(v.correction || '')}">refined</span>` : ''}
       ${v.score != null ? `<span class="score" title="face similarity to the references">${v.score.toFixed(2)}</span>` : ''}
       <button class="pickbtn">${v.picked ? '✓ Picked' : 'Pick'}</button></div>`;
   }
@@ -455,7 +466,7 @@ function renderReview(onlyGrids) {
         </div>
         <div class="take-b">
           <div class="variants" data-grid></div>
-          <div class="tweak"><input type="text" data-extra placeholder="Correction for the next variants, e.g. 'hair shorter, no glasses'" value="${esc(t.extra)}">
+          <div class="tweak"><input type="text" data-extra placeholder="Add to the prompt for new variants (starts from scratch), e.g. 'hair shorter, no glasses'" value="${esc(t.extra)}">
             <button class="b small" data-regen>Apply and generate</button></div>
         </div>
       </div>`).join('') || '<p class="muted">Nothing to show.</p>';
@@ -505,8 +516,17 @@ function showLB() {
   $('#lb-pick').textContent = v.picked ? '✓ Picked (P to unpick)' : 'Pick (P)';
   $('#lb-promote').style.display = t.role !== 'dataset' ? '' : 'none';
   $('#lb-score').textContent = v.score != null ? `Face similarity: ${v.score.toFixed(3)}` : '';
-  const refFiles = new Set(v.refs || []);
-  $('#lb-refs').innerHTML = S.sources.filter(s => refFiles.has(s.file)).map(s => `<img src="/files/sources/${s.file}?w=600" alt="">`).join('') || '<span class="muted">none</span>';
+  const parent = v.parent ? t.variants.find(x => x.id === v.parent) : null;
+  $('#lb-seed').textContent = `Seed ${v.seed}` + (parent && parent.seed === v.seed ? ' (same as the image it was refined from)' : '');
+  if (v.parent) {
+    $('#lb-refs-label').textContent = 'Refined from';
+    $('#lb-refs').innerHTML = (parent?.file ? `<img src="/files/takes/${t.id}/${parent.file}?w=600" alt="">` : '<span class="muted">(that image was deleted)</span>')
+      + `<div class="lb-small">Change: ${esc(v.correction || '')}</div>`;
+  } else {
+    $('#lb-refs-label').textContent = 'References used';
+    const refFiles = new Set(v.refs || []);
+    $('#lb-refs').innerHTML = S.sources.filter(s => refFiles.has(s.file)).map(s => `<img src="/files/sources/${s.file}?w=600" alt="">`).join('') || '<span class="muted">none</span>';
+  }
   $('#lb-prompt').textContent = v.prompt || '';
 }
 function stepLB(d) {
@@ -517,11 +537,21 @@ function stepLB(d) {
 $('#lb-close').onclick = closeLB;
 $('#lb-pick').onclick = () => pick(LB.t, LB.v);
 $('#lb-promote').onclick = async () => { await api('POST', `/api/variants/${LB.t}/${LB.v}/promote`, {}); await refresh(); toast('Added to Sources as a reference'); showLB(); renderReview(true); };
+$('#lb-refine').onclick = async () => {
+  const correction = $('#lb-fix').value.trim();
+  if (!correction) { $('#lb-fix').focus(); return toast('Write what to change first'); }
+  const r = await api('POST', `/api/variants/${LB.t}/${LB.v}/refine`, { correction });
+  $('#lb-fix').value = '';
+  toast(`Queued ${r.queued.length} refinements`);
+  await refresh(); renderReview(true); poll();
+};
+$('#lb-fix').onkeydown = e => { if (e.key === 'Enter') $('#lb-refine').click(); };
 $('#lightbox').onclick = e => { if (e.target.classList.contains('lb-main')) closeLB(); };
 document.addEventListener('keydown', e => {
   if (!LB.open) return;
-  if (e.key === 'Escape') closeLB();
-  else if (e.key === 'ArrowRight') stepLB(1);
+  if (e.key === 'Escape') return closeLB();
+  if (e.target.matches('input, textarea')) return;  // typing a correction
+  if (e.key === 'ArrowRight') stepLB(1);
   else if (e.key === 'ArrowLeft') stepLB(-1);
   else if (e.key.toLowerCase() === 'p') pick(LB.t, LB.v);
 });

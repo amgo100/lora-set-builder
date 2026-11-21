@@ -306,9 +306,15 @@ def create_app(project_dir: str) -> FastAPI:
         with p.lock:
             take = get_take(take_id)
             keep, drop = [], []
+            # images a queued refinement still has to send
+            needed = {
+                v["parent"]
+                for v in take["variants"]
+                if v.get("parent") and v["status"] in ("queued", "running")
+            }
             for v in take["variants"]:
                 busy = v["status"] in ("queued", "running")
-                if busy or (which == "unpicked" and v.get("picked")):
+                if busy or v["id"] in needed or (which == "unpicked" and v.get("picked")):
                     keep.append(v)
                 else:
                     drop.append(v)
@@ -334,6 +340,25 @@ def create_app(project_dir: str) -> FastAPI:
             v["picked"] = new_val
             p.save()
         return {"picked": new_val}
+
+    @app.post("/api/variants/{take_id}/{vid}/refine")
+    def refine(take_id: str, vid: str, body: dict = Body(default={})):
+        """Queue edits of one variant with a correction applied; the first
+        reuses the variant's seed."""
+        correction = str(body.get("correction") or "").strip()
+        if not correction:
+            raise HTTPException(400, "write what to change")
+        with p.lock:
+            get_take(take_id)
+            try:
+                v = p.variant(take_id, vid)
+            except KeyError:
+                raise HTTPException(404)
+            if v["status"] != "done" or not v.get("file"):
+                raise HTTPException(400, "variant has no image yet")
+        count = int(body.get("count") or p.settings["generation"]["variants_per_take"])
+        ids = gen.request(take_id, max(1, min(count, 16)), parent=vid, correction=correction)
+        return {"queued": ids}
 
     @app.post("/api/variants/{take_id}/{vid}/promote")
     def promote(take_id: str, vid: str, body: dict = Body(default={})):
