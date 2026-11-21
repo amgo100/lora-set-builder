@@ -53,14 +53,27 @@ button.b.small { padding: 3px 8px; font-size: 12px; }
 .tag { display: inline-block; font-size: 11px; padding: 1px 6px; border-radius: 4px; background: #eceae4; color: #55544f; }
 .tag.anchor { background: #f3e6d2; color: #7a4a10; } .tag.ref { background: #dfe8f2; color: #2f5d8a; }
 .tag.dataset { background: #e4efe7; color: #2e6b45; }
-table.takes { width: 100%; border-collapse: collapse; font-size: 13px; }
-table.takes th { text-align: left; font-weight: 600; color: var(--muted); font-size: 12px; padding: 6px 4px; border-bottom: 1px solid var(--line); }
-table.takes td { padding: 4px; border-bottom: 1px solid #efefeb; vertical-align: top; }
-table.takes td input, table.takes td select { padding: 4px 6px; font-size: 13px; }
-table.takes td select { min-width: 104px; }
-table.takes td input[type=text] { min-width: 120px; }
-.table-wrap { overflow-x: auto; }
-table.takes tr.expanded td { background: #fafaf8; }
+.trows { display: flex; flex-direction: column; gap: 8px; }
+.trow { border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; background: var(--panel); }
+.trow.expanded { background: #fafaf8; }
+.trow-top { display: grid; grid-template-columns: 26px 30px repeat(3, 112px) 100px 1fr 1fr auto; gap: 8px; align-items: start; }
+.trow-top > button, .trow-top > .num, .trow-top > .acts { margin-top: 18px; }
+.trow-desc { display: grid; grid-template-columns: 2fr 1.3fr 1fr; gap: 8px; margin-top: 6px; }
+.trow-more { margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--line); }
+.trow label.f { font-size: 11px; gap: 2px; min-width: 0; }
+.trow input, .trow select, .trow textarea { padding: 4px 6px; font-size: 13px; }
+.trow textarea.grow { min-height: 0; resize: none; overflow: hidden; line-height: 1.4; }
+.trow .num { color: var(--muted); font-size: 12px; text-align: right; padding-top: 5px; }
+.trow .acts { display: flex; gap: 4px; align-items: center; }
+@media (max-width: 960px) {
+  .trow-top { display: flex; flex-wrap: wrap; }
+  .trow-top label.f { flex: 1 1 120px; }
+  .trow-top label.f.txt { flex: 1 1 260px; }
+  .trow-top > button, .trow-top > .num { order: -2; margin-top: 0; }
+  .trow-top > .acts { order: -1; margin: 0 0 0 auto; }
+  .trow-top::after { content: ""; order: -1; flex-basis: 100%; }
+  .trow-desc { grid-template-columns: 1fr; }
+}
 .prompt-preview { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 12px; white-space: pre-wrap; color: #44443f; background: #f3f3f0; padding: 8px; border-radius: 6px; }
 .toolbar { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-bottom: 14px; }
 .toolbar .spacer { flex: 1; }
@@ -195,11 +208,7 @@ table.takes tr.expanded td { background: #fafaf8; }
     <button class="b" id="add-sheet">Add reference sheet</button>
     <button class="b" id="add-blank">Add blank take</button>
   </div>
-  <div class="panel table-wrap" style="padding:8px 10px">
-    <table class="takes"><thead><tr>
-      <th></th><th>Role</th><th>Mode</th><th>Framing</th><th>Angle</th><th>Expression</th><th>Outfit</th><th>Setting</th><th>Lighting</th><th>Aspect</th><th></th>
-    </tr></thead><tbody id="take-rows"></tbody></table>
-  </div>
+  <div class="trows" id="take-rows"></div>
 </section>
 
 <!-- ============================================================ REVIEW -->
@@ -375,28 +384,33 @@ async function upload(files) {
 const opts = (vals, cur) => vals.map(v => { const [val, lab] = Array.isArray(v) ? v : [v, v]; return `<option value="${val}" ${val === cur ? 'selected' : ''}>${lab}</option>`; }).join('');
 function renderTakes() {
   const rows = $('#take-rows');
-  if (!S.takes.length) { rows.innerHTML = '<tr><td colspan="11" class="muted" style="padding:14px">No takes yet. Add the default set to start.</td></tr>'; return; }
+  if (!S.takes.length) { rows.innerHTML = '<div class="panel muted">No takes yet. Add the default set to start.</div>'; return; }
   const srcOpts = [['', '– source to edit –'], ...S.sources.map(s => [s.id, (s.original_name || s.file).slice(0, 30)])];
-  rows.innerHTML = S.takes.map(t => {
+  const lab = (text, field, cls = '') => `<label class="f ${cls}">${text}${field}</label>`;
+  const area = (f, v, ph = '') => `<textarea class="grow" rows="1" data-f="${f}" placeholder="${ph}">${esc(v)}</textarea>`;
+  rows.innerHTML = S.takes.map((t, i) => {
     const open = expanded.has(t.id);
     const n = t.variants.length;
-    return `<tr data-id="${t.id}" class="${open ? 'expanded' : ''}">
-      <td><button class="b small" data-x title="Prompt and caption">${open ? '▾' : '▸'}</button></td>
-      <td><select data-f="role">${opts([['dataset', 'dataset'], ['anchor', 'anchor'], ['ref', 'reference']], t.role)}</select></td>
-      <td><select data-f="mode">${opts([['reference', 'from refs'], ['edit', 'edit photo'], ['t2i', 'text only']], t.mode)}</select></td>
-      <td><select data-f="framing">${opts(['', 'close-up', 'medium', 'full-body'], t.framing)}</select></td>
-      <td><input type="text" data-f="angle" value="${esc(t.angle)}"></td>
-      <td><input type="text" data-f="expression" value="${esc(t.expression)}"></td>
-      <td><input type="text" data-f="outfit" value="${esc(t.outfit)}" placeholder="(usual)"></td>
-      <td><input type="text" data-f="setting" value="${esc(t.setting)}"></td>
-      <td><input type="text" data-f="lighting" value="${esc(t.lighting)}"></td>
-      <td><select data-f="aspect">${opts(['portrait', 'square', 'landscape'], t.aspect)}</select></td>
-      <td class="row" style="flex-wrap:nowrap"><span class="muted" title="variants">${n || ''}</span>
-        <button class="b small" data-dup title="Duplicate">⧉</button>
-        <button class="b small danger" data-del title="Delete">✕</button></td>
-    </tr>
-    ${open ? `<tr class="expanded" data-id="${t.id}"><td></td><td colspan="10">
-      <div class="grid2">
+    return `<div class="trow ${open ? 'expanded' : ''}" data-id="${t.id}">
+      <div class="trow-top">
+        <button class="b small" data-x title="Prompt and caption">${open ? '▾' : '▸'}</button>
+        <span class="num">${i + 1}</span>
+        ${lab('Role', `<select data-f="role">${opts([['dataset', 'dataset'], ['anchor', 'anchor'], ['ref', 'reference']], t.role)}</select>`)}
+        ${lab('Mode', `<select data-f="mode">${opts([['reference', 'from refs'], ['edit', 'edit photo'], ['t2i', 'text only']], t.mode)}</select>`)}
+        ${lab('Framing', `<select data-f="framing">${opts(['', 'close-up', 'medium', 'full-body'], t.framing)}</select>`)}
+        ${lab('Aspect', `<select data-f="aspect">${opts(['portrait', 'square', 'landscape'], t.aspect)}</select>`)}
+        ${lab('Angle', area('angle', t.angle), 'txt')}
+        ${lab('Expression', area('expression', t.expression), 'txt')}
+        <div class="acts"><span class="muted" title="generated images">${n ? n + ' img' : ''}</span>
+          <button class="b small" data-dup title="Duplicate">⧉</button>
+          <button class="b small danger" data-del title="Delete">✕</button></div>
+      </div>
+      <div class="trow-desc">
+        ${lab('Outfit', area('outfit', t.outfit, '(as in the references)'))}
+        ${lab('Setting', area('setting', t.setting))}
+        ${lab('Lighting', area('lighting', t.lighting))}
+      </div>
+      ${open ? `<div class="trow-more"><div class="grid2">
         <label class="f">Title<input type="text" data-f="title" value="${esc(t.title)}"></label>
         <label class="f">Photo to edit (edit mode)<select data-f="edit_source">${opts(srcOpts, t.edit_source)}</select></label>
         <label class="f wide">Extra instructions added to the prompt<input type="text" data-f="extra" value="${esc(t.extra)}" placeholder="e.g. holding a cup of coffee"></label>
@@ -405,23 +419,33 @@ function renderTakes() {
           <textarea data-f="prompt_override" rows="2">${esc(t.prompt_override)}</textarea></label>
         <label class="f wide">Training caption (leave empty to use the automatic one)
           <input type="text" data-f="caption" value="${t.caption_edited ? esc(t.caption) : ''}" placeholder="${esc(t.caption)}"></label>
-      </div></td></tr>` : ''}`;
+      </div></div>` : ''}
+    </div>`;
   }).join('');
-  $$('tr[data-id]', rows).forEach(tr => {
+  $$('.trow', rows).forEach(tr => {
     const id = tr.dataset.id;
     $$('[data-f]', tr).forEach(el => el.onchange = async () => {
       await api('PATCH', `/api/takes/${id}`, { [el.dataset.f]: el.value }); await refresh();
       if (expanded.has(id) || ['mode', 'role'].includes(el.dataset.f)) renderTakes();
     });
-    const x = $('[data-x]', tr); if (x) x.onclick = () => { expanded.has(id) ? expanded.delete(id) : expanded.add(id); renderTakes(); };
-    const d = $('[data-dup]', tr); if (d) d.onclick = async () => { await api('POST', `/api/takes/${id}/duplicate`); await refresh(); renderTakes(); };
-    const del = $('[data-del]', tr); if (del) del.onclick = async () => {
+    $$('textarea.grow', tr).forEach(el => {
+      el.oninput = () => growArea(el);
+      // one-line values: Enter saves instead of adding a line break
+      el.onkeydown = e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); el.blur(); } };
+    });
+    $('[data-x]', tr).onclick = () => { expanded.has(id) ? expanded.delete(id) : expanded.add(id); renderTakes(); };
+    $('[data-dup]', tr).onclick = async () => { await api('POST', `/api/takes/${id}/duplicate`); await refresh(); renderTakes(); };
+    $('[data-del]', tr).onclick = async () => {
       const t = S.takes.find(t => t.id === id);
       if (t.variants.length && !confirm('Delete this take and its generated images?')) return;
       await api('DELETE', `/api/takes/${id}`); await refresh(); renderTakes();
     };
   });
+  growAll();
 }
+function growArea(el) { if (!el.offsetParent) return; el.style.height = 'auto'; el.style.height = el.scrollHeight + 2 + 'px'; }
+function growAll() { $$('#take-rows textarea.grow').forEach(growArea); }
+window.addEventListener('resize', growAll);
 $('#add-default').onclick = async () => { const r = await api('POST', '/api/takes/default', { n: +$('#n-default').value, keep_outfit: $('#keep-outfit').checked }); toast(`Added ${r.added} takes`); await refresh(); renderTakes(); };
 $('#replace-default').onclick = async () => { if (!confirm('Remove dataset takes that have no images yet, then add a new default set?')) return; await api('POST', '/api/takes/default', { n: +$('#n-default').value, keep_outfit: $('#keep-outfit').checked, replace: true }); await refresh(); renderTakes(); };
 $('#add-anchor').onclick = async () => { await api('POST', '/api/takes', { template: 'anchor' }); await refresh(); renderTakes(); toast('Anchor added at the top. Fill in the description in Setup.'); };

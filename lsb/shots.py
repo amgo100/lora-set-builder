@@ -62,15 +62,38 @@ LIGHTING = [
     "night-time street lighting",
 ]
 
+# Detailed on purpose: with a vague outfit ("a hoodie") the model tends to copy
+# the clothes from the reference images. Colour, material, fit and footwear
+# give it something concrete to draw instead. Kept gender-neutral and free of
+# hats and glasses, which would hide or alter identity features. The length
+# (16) must stay coprime with the stride used below (3).
 OUTFITS = [
-    "a plain t-shirt",
-    "a button-up shirt",
-    "a knitted sweater",
-    "a denim jacket",
-    "a smart suit",
-    "sportswear",
-    "a winter coat and scarf",
-    "a hoodie",
+    "a fitted white crew-neck t-shirt, dark indigo straight-leg jeans and white canvas sneakers",
+    "a light-blue oxford button-up shirt with the sleeves rolled up, beige chinos and brown "
+    "leather loafers",
+    "a chunky cream cable-knit sweater, charcoal wool trousers and brown suede ankle boots",
+    "a faded mid-blue denim jacket over a grey marl t-shirt, black jeans and black leather boots",
+    "a tailored navy two-piece suit, a crisp white shirt and polished black leather shoes",
+    "a black zip-up track jacket with white stripes down the sleeves, matching track pants and "
+    "grey running shoes",
+    "a long camel wool overcoat worn open, a red-and-green tartan scarf, dark grey trousers and "
+    "black leather boots",
+    "an oversized forest-green hoodie, light-grey jogger trousers and white high-top sneakers",
+    "a mustard-yellow corduroy overshirt over a black t-shirt, olive cargo trousers and tan "
+    "work boots",
+    "a short-sleeved pale terracotta linen shirt, stone-coloured linen shorts and brown "
+    "leather sandals",
+    "a black leather biker jacket, a plain white t-shirt, slim black jeans and black "
+    "Chelsea boots",
+    "a quilted olive-green puffer jacket zipped up, a navy fleece underneath, grey jeans and "
+    "brown hiking boots",
+    "a burgundy roll-neck sweater under a grey houndstooth wool blazer, dark trousers and "
+    "brown brogues",
+    "a navy-and-white striped Breton top, a beige trench coat worn open, dark jeans and white "
+    "leather sneakers",
+    "a bright-red hooded rain jacket with the hood down, navy trousers and yellow rubber boots",
+    "a dark-green waxed cotton field jacket over a cream knitted jumper, brown corduroy "
+    "trousers and leather lace-up boots",
 ]
 
 # share of each framing in the default set
@@ -237,7 +260,14 @@ def compose_prompt(take: dict[str, Any], settings: dict[str, Any], n_refs: int) 
             f"Edit <image1>: keep the same {who} and change the pose, clothing and "
             f"surroundings as follows. {scene}{extra_refs} {lock}"
         )
-    return f"A new photograph of {subject_ref}. {scene} {lock}"
+    clothes = ""
+    if take.get("outfit"):
+        # without this the model often keeps the clothes from the references
+        clothes = (
+            f" Dress the {who} in the outfit described above, not in the clothes "
+            f"from the reference images."
+        )
+    return f"A new photograph of {subject_ref}. {scene}{clothes} {lock}"
 
 
 def compose_refine_prompt(correction: str, settings: dict[str, Any]) -> str:

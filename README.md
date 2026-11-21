@@ -128,9 +128,11 @@ character consistent.
 
 ### 3. Shot list
 **Add default set** creates a set of takes (20 by default) that cycle through framing (≈35 % close-up, 40 % medium,
-25 % full body), eight camera angles, six expressions, eight outfits, twelve settings and six
-lighting setups, without repeating combinations. Tick *keep the same outfit* for a character
-whose costume is part of its identity. Every field is editable. Expand a row (▸) to see the exact
+25 % full body), eight camera angles, six expressions, sixteen outfits, twelve settings and six
+lighting setups, without repeating combinations. Outfits are spelled out in detail (garments,
+colours, materials, footwear) and the prompt tells the model not to use the clothes from the
+reference images; with a vague outfit such as “a hoodie” the model tends to copy them. Tick
+*keep the same outfit* for a character whose costume is part of its identity. Every field is editable. Expand a row (▸) to see the exact
 prompt, add extra instructions, write a prompt by hand, or override the caption.
 
 Take modes:
