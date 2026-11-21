@@ -65,7 +65,9 @@ LIGHTING = [
 # Detailed on purpose: with a vague outfit ("a hoodie") the model tends to copy
 # the clothes from the reference images. Colour, material, fit and footwear
 # give it something concrete to draw instead. Kept gender-neutral and free of
-# hats and glasses, which would hide or alter identity features. The length
+# hats and glasses, which would hide or alter identity features. Everything
+# worn above the waist comes before the first comma: close-up and medium-shot
+# captions keep only that part (see caption_outfit). The length
 # (16) must stay coprime with the stride used below (3).
 OUTFITS = [
     "a fitted white crew-neck t-shirt, dark indigo straight-leg jeans and white canvas sneakers",
@@ -73,20 +75,20 @@ OUTFITS = [
     "leather loafers",
     "a chunky cream cable-knit sweater, charcoal wool trousers and brown suede ankle boots",
     "a faded mid-blue denim jacket over a grey marl t-shirt, black jeans and black leather boots",
-    "a tailored navy two-piece suit, a crisp white shirt and polished black leather shoes",
+    "a tailored navy two-piece suit with a crisp white shirt, polished black leather shoes",
     "a black zip-up track jacket with white stripes down the sleeves, matching track pants and "
     "grey running shoes",
-    "a long camel wool overcoat worn open, a red-and-green tartan scarf, dark grey trousers and "
-    "black leather boots",
+    "a long camel wool overcoat worn open with a red-and-green tartan scarf, dark grey trousers "
+    "and black leather boots",
     "an oversized forest-green hoodie, light-grey jogger trousers and white high-top sneakers",
     "a mustard-yellow corduroy overshirt over a black t-shirt, olive cargo trousers and tan "
     "work boots",
     "a short-sleeved pale terracotta linen shirt, stone-coloured linen shorts and brown "
     "leather sandals",
-    "a black leather biker jacket, a plain white t-shirt, slim black jeans and black "
+    "a black leather biker jacket over a plain white t-shirt, slim black jeans and black "
     "Chelsea boots",
-    "a quilted olive-green puffer jacket zipped up, a navy fleece underneath, grey jeans and "
-    "brown hiking boots",
+    "a quilted olive-green puffer jacket zipped up over a navy fleece, grey jeans and brown "
+    "hiking boots",
     "a burgundy roll-neck sweater under a grey houndstooth wool blazer, dark trousers and "
     "brown brogues",
     "a navy-and-white striped Breton top, a beige trench coat worn open, dark jeans and white "
@@ -299,13 +301,28 @@ def compose_caption(take: dict[str, Any], settings: dict[str, Any]) -> str:
     for key in ("angle", "expression"):
         if take.get(key):
             parts.append(take[key])
-    if take.get("outfit"):
-        parts.append(f"wearing {take['outfit']}")
+    outfit = caption_outfit(take)
+    if outfit:
+        parts.append(f"wearing {outfit}")
     if take.get("setting"):
         parts.append(take["setting"])
     if take.get("lighting"):
         parts.append(take["lighting"])
     return ", ".join(parts)
+
+
+def caption_outfit(take: dict[str, Any]) -> str:
+    """The part of the outfit a caption should mention.
+
+    Close-ups and medium shots end at the shoulders or the waist, so only the
+    first part of the outfit (up to the first comma: the top, as the default
+    outfits are written) is visible; trousers and shoes would describe
+    things that are not in the image.
+    """
+    outfit = (take.get("outfit") or "").strip()
+    if take.get("framing") in ("close-up", "medium"):
+        outfit = outfit.split(",")[0].strip()
+    return outfit
 
 
 def source_caption(settings: dict[str, Any]) -> str:
